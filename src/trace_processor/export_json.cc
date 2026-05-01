@@ -1298,6 +1298,11 @@ class JsonExporter {
       if (auto v = sit.source(); v) {
         profile_data["source"] = storage_->GetString(*v).ToStdString();
       }
+      // DevTools' CPUProfileDataModel keys profile streams by an integer id.
+      // The legacy V8 phase-sample emitter populated `data.id` from the V8
+      // ProfilerId; mirror that here using the same value we surface as the
+      // hex top-level `id`.
+      profile_data["id"] = static_cast<int64_t>(session_id);
       Dom profile_args(Type::kObject);
       profile_args["data"] = std::move(profile_data);
       profile_event["args"] = std::move(profile_args);
@@ -1417,6 +1422,7 @@ class JsonExporter {
           data["lines"] = std::move(lines_array);
           data["columns"] = std::move(columns_array);
         }
+        data["id"] = static_cast<int64_t>(session_id);
 
         Dom args(Type::kObject);
         args["data"] = std::move(data);
@@ -1462,6 +1468,7 @@ class JsonExporter {
         if (auto v = sit.source(); v) {
           end_data["source"] = storage_->GetString(*v).ToStdString();
         }
+        end_data["id"] = static_cast<int64_t>(session_id);
         Dom end_args(Type::kObject);
         end_args["data"] = std::move(end_data);
         end_event["args"] = std::move(end_args);

@@ -2203,9 +2203,11 @@ TEST_F(ExportJsonTest, V8CpuProfileFromTables) {
   session_row.utid = utid;
   session_row.start_ts = kStartTs;
   session_row.start_time_us = 10000;
+  session_row.start_thread_ts = 5000000;  // 5000us tts
   session_row.source = context_.storage->InternString("Inspector");
   session_row.end_ts = kEndTs;
   session_row.end_time_us = 13000;
+  session_row.end_thread_ts = 8000000;  // 8000us tts
   auto session_id = context_.storage->mutable_v8_cpu_profile_session_table()
                         ->Insert(session_row)
                         .id;
@@ -2214,6 +2216,7 @@ TEST_F(ExportJsonTest, V8CpuProfileFromTables) {
   tables::V8CpuProfileChunkTable::Row chunk_row;
   chunk_row.v8_cpu_profile_session_id = session_id;
   chunk_row.ts = kSampleTs0;
+  chunk_row.thread_ts = 6000000;  // 6000us tts
   auto chunk_id = context_.storage->mutable_v8_cpu_profile_chunk_table()
                       ->Insert(chunk_row)
                       .id;
@@ -2304,17 +2307,25 @@ TEST_F(ExportJsonTest, V8CpuProfileFromTables) {
   EXPECT_EQ((*profile_event)["id"].AsString(), (*chunk_event)["id"].AsString());
   EXPECT_EQ((*profile_event)["id"].AsString(), (*end_event)["id"].AsString());
 
-  // Profile data: startTime + source, no `id` key.
+  // Profile data: startTime + source + integer `id` (DevTools key).
   const auto& pdata = (*profile_event)["args"]["data"];
   EXPECT_EQ(pdata["startTime"].AsInt64(), 10000);
   EXPECT_EQ(pdata["source"].AsString(), "Inspector");
-  EXPECT_FALSE(pdata.HasMember("id"));
+  ASSERT_TRUE(pdata.HasMember("id"));
+  EXPECT_EQ(pdata["id"].AsInt64(), static_cast<int64_t>(kSessionId));
+  // Thread time (tts) is plumbed from start_thread_ts.
+  ASSERT_TRUE((*profile_event).HasMember("tts"));
+  EXPECT_EQ((*profile_event)["tts"].AsInt64(), 5000);
 
   // ProfileChunk data: source + cpuProfile{nodes,samples,trace_ids} +
-  // timeDeltas, no `id`.
+  // timeDeltas + integer `id` (DevTools key).
   const auto& cdata = (*chunk_event)["args"]["data"];
   EXPECT_EQ(cdata["source"].AsString(), "Inspector");
-  EXPECT_FALSE(cdata.HasMember("id"));
+  ASSERT_TRUE(cdata.HasMember("id"));
+  EXPECT_EQ(cdata["id"].AsInt64(), static_cast<int64_t>(kSessionId));
+  // Thread time (tts) is plumbed from chunk.thread_ts.
+  ASSERT_TRUE((*chunk_event).HasMember("tts"));
+  EXPECT_EQ((*chunk_event)["tts"].AsInt64(), 6000);
   ASSERT_TRUE(cdata.HasMember("cpuProfile"));
   const auto& cp = cdata["cpuProfile"];
   ASSERT_TRUE(cp.HasMember("nodes"));
@@ -2353,11 +2364,16 @@ TEST_F(ExportJsonTest, V8CpuProfileFromTables) {
   EXPECT_FALSE(cdata.HasMember("lines"));
   EXPECT_FALSE(cdata.HasMember("columns"));
 
-  // End ProfileChunk: endTime + source, no cpuProfile, no `id` in data.
+  // End ProfileChunk: endTime + source + integer `id`, no cpuProfile.
   const auto& edata = (*end_event)["args"]["data"];
   EXPECT_EQ(edata["endTime"].AsInt64(), 13000);
   EXPECT_EQ(edata["source"].AsString(), "Inspector");
-  EXPECT_FALSE(edata.HasMember("id"));
+  ASSERT_TRUE(edata.HasMember("id"));
+  EXPECT_EQ(edata["id"].AsInt64(), static_cast<int64_t>(kSessionId));
+  // Thread time (tts) on the session-end chunk is plumbed from
+  // end_thread_ts.
+  ASSERT_TRUE((*end_event).HasMember("tts"));
+  EXPECT_EQ((*end_event)["tts"].AsInt64(), 8000);
   EXPECT_FALSE(edata.HasMember("cpuProfile"));
 }
 
