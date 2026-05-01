@@ -164,13 +164,13 @@ struct alignas(8) TrackEventData {
 };
 static_assert(sizeof(TracePacketData) % 8 == 0);
 
-struct alignas(8) LegacyV8CpuProfileEvent {
+struct alignas(8) V8CpuProfileEvent {
   uint64_t session_id;
   uint32_t pid;
   uint32_t tid;
   uint32_t callsite_id;
 };
-static_assert(sizeof(LegacyV8CpuProfileEvent) % 8 == 0);
+static_assert(sizeof(V8CpuProfileEvent) % 8 == 0);
 
 }  // namespace perfetto::trace_processor
 

@@ -41,8 +41,8 @@
 #include "perfetto/trace_processor/trace_blob_view.h"
 #include "src/trace_processor/containers/string_pool.h"
 #include "src/trace_processor/importers/common/clock_tracker.h"
-#include "src/trace_processor/importers/common/legacy_v8_cpu_profile_tracker.h"
 #include "src/trace_processor/importers/common/parser_types.h"
+#include "src/trace_processor/importers/common/v8_cpu_profile_tracker.h"
 #include "src/trace_processor/importers/common/v8_profile_parser.h"
 #include "src/trace_processor/importers/json/json_trace_parser.h"
 #include "src/trace_processor/importers/systrace/systrace_line.h"
@@ -376,15 +376,13 @@ class SystraceSink : public TraceSorter::Sink<SystraceLine, SystraceSink> {
  private:
   JsonTraceParser* parser_;
 };
-class V8Sink : public TraceSorter::Sink<LegacyV8CpuProfileEvent, V8Sink> {
+class V8Sink : public TraceSorter::Sink<V8CpuProfileEvent, V8Sink> {
  public:
-  explicit V8Sink(LegacyV8CpuProfileTracker* tracker) : tracker_(tracker) {}
-  void Parse(int64_t ts, LegacyV8CpuProfileEvent data) {
-    tracker_->Parse(ts, data);
-  }
+  explicit V8Sink(V8CpuProfileTracker* tracker) : tracker_(tracker) {}
+  void Parse(int64_t ts, V8CpuProfileEvent data) { tracker_->Parse(ts, data); }
 
  private:
-  LegacyV8CpuProfileTracker* tracker_;
+  V8CpuProfileTracker* tracker_;
 };
 
 }  // namespace
@@ -484,7 +482,7 @@ ReadSystemLineRes ReadOneSystemTraceLine(const char* start,
 JsonTraceTokenizer::JsonTraceTokenizer(TraceProcessorContext* ctx)
     : context_(ctx),
       parser_(ctx),
-      v8_tracker_(std::make_unique<LegacyV8CpuProfileTracker>(ctx)),
+      v8_tracker_(std::make_unique<V8CpuProfileTracker>(ctx)),
       json_stream_(
           context_->sorter->CreateStream(std::make_unique<JsonSink>(&parser_))),
       systrace_stream_(context_->sorter->CreateStream(
@@ -863,9 +861,8 @@ base::Status JsonTraceTokenizer::ParseV8SampleEvent(const JsonEvent& event) {
                          id, event.pid, profile.time_deltas[i] * 1000));
     auto trace_ts = context_->clock_tracker->ToTraceTime(trace_file_clock_, ts);
     if (trace_ts) {
-      v8_stream_->Push(*trace_ts,
-                       LegacyV8CpuProfileEvent{id, event.pid, event.tid,
-                                               profile.samples[i]});
+      v8_stream_->Push(*trace_ts, V8CpuProfileEvent{id, event.pid, event.tid,
+                                                    profile.samples[i]});
     }
   }
   return base::OkStatus();

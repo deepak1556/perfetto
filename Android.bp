@@ -2993,6 +2993,7 @@ cc_test {
         ":perfetto_src_trace_processor_importers_proto_minimal",
         ":perfetto_src_trace_processor_importers_proto_packet_sequence_state_generation_hdr",
         ":perfetto_src_trace_processor_importers_proto_proto_importer_module",
+        ":perfetto_src_trace_processor_importers_proto_v8_importer",
         ":perfetto_src_trace_processor_importers_proto_winscope_full",
         ":perfetto_src_trace_processor_importers_simpleperf_proto_simpleperf_proto",
         ":perfetto_src_trace_processor_importers_syscalls_full",
@@ -3498,6 +3499,7 @@ filegroup {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
         "protos/perfetto/trace/clock_snapshot.proto",
         "protos/perfetto/trace/etw/etw.proto",
         "protos/perfetto/trace/etw/etw_event.proto",
@@ -8514,6 +8516,7 @@ filegroup {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
     ],
 }
 
@@ -8534,6 +8537,7 @@ genrule {
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.gen.cc",
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trigger.gen.cc",
         "external/perfetto/protos/perfetto/trace/chrome/v8.gen.cc",
+        "external/perfetto/protos/perfetto/trace/chrome/v8_cpu_profile.gen.cc",
     ],
 }
 
@@ -8554,6 +8558,7 @@ genrule {
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.gen.h",
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trigger.gen.h",
         "external/perfetto/protos/perfetto/trace/chrome/v8.gen.h",
+        "external/perfetto/protos/perfetto/trace/chrome/v8_cpu_profile.gen.h",
     ],
     export_include_dirs: [
         ".",
@@ -8570,6 +8575,7 @@ filegroup {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
     ],
 }
 
@@ -8589,6 +8595,7 @@ genrule {
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pb.cc",
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trigger.pb.cc",
         "external/perfetto/protos/perfetto/trace/chrome/v8.pb.cc",
+        "external/perfetto/protos/perfetto/trace/chrome/v8_cpu_profile.pb.cc",
     ],
 }
 
@@ -8608,6 +8615,7 @@ genrule {
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pb.h",
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trigger.pb.h",
         "external/perfetto/protos/perfetto/trace/chrome/v8.pb.h",
+        "external/perfetto/protos/perfetto/trace/chrome/v8_cpu_profile.pb.h",
     ],
     export_include_dirs: [
         ".",
@@ -8624,6 +8632,7 @@ filegroup {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
     ],
 }
 
@@ -8644,6 +8653,7 @@ genrule {
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pbzero.cc",
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trigger.pbzero.cc",
         "external/perfetto/protos/perfetto/trace/chrome/v8.pbzero.cc",
+        "external/perfetto/protos/perfetto/trace/chrome/v8_cpu_profile.pbzero.cc",
     ],
 }
 
@@ -8664,6 +8674,7 @@ genrule {
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pbzero.h",
         "external/perfetto/protos/perfetto/trace/chrome/chrome_trigger.pbzero.h",
         "external/perfetto/protos/perfetto/trace/chrome/v8.pbzero.h",
+        "external/perfetto/protos/perfetto/trace/chrome/v8_cpu_profile.pbzero.h",
     ],
     export_include_dirs: [
         ".",
@@ -8777,6 +8788,7 @@ genrule {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
         "protos/perfetto/trace/clock_snapshot.proto",
         "protos/perfetto/trace/etw/etw.proto",
         "protos/perfetto/trace/etw/etw_event.proto",
@@ -10365,6 +10377,7 @@ genrule {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
         "protos/perfetto/trace/gpu/gpu_counter_event.proto",
         "protos/perfetto/trace/gpu/gpu_interned_data.proto",
         "protos/perfetto/trace/gpu/gpu_log.proto",
@@ -15718,7 +15731,6 @@ filegroup {
         "src/trace_processor/importers/common/gpu_tracker.cc",
         "src/trace_processor/importers/common/import_logs_tracker.cc",
         "src/trace_processor/importers/common/jit_cache.cc",
-        "src/trace_processor/importers/common/legacy_v8_cpu_profile_tracker.cc",
         "src/trace_processor/importers/common/machine_tracker.cc",
         "src/trace_processor/importers/common/mapping_tracker.cc",
         "src/trace_processor/importers/common/metadata_tracker.cc",
@@ -15735,6 +15747,7 @@ filegroup {
         "src/trace_processor/importers/common/trace_file_tracker.cc",
         "src/trace_processor/importers/common/track_compressor.cc",
         "src/trace_processor/importers/common/track_tracker.cc",
+        "src/trace_processor/importers/common/v8_cpu_profile_tracker.cc",
         "src/trace_processor/importers/common/virtual_memory_mapping.cc",
     ],
 }
@@ -16060,20 +16073,15 @@ filegroup {
         "src/trace_processor/importers/proto/graphics_frame_event_parser.cc",
         "src/trace_processor/importers/proto/heap_graph_module.cc",
         "src/trace_processor/importers/proto/heap_graph_tracker.cc",
-        "src/trace_processor/importers/proto/jit_tracker.cc",
         "src/trace_processor/importers/proto/metadata_module.cc",
         "src/trace_processor/importers/proto/pigweed_detokenizer.cc",
         "src/trace_processor/importers/proto/pixel_modem_module.cc",
         "src/trace_processor/importers/proto/pixel_modem_parser.cc",
         "src/trace_processor/importers/proto/profile_module.cc",
         "src/trace_processor/importers/proto/statsd_module.cc",
-        "src/trace_processor/importers/proto/string_encoding_utils.cc",
         "src/trace_processor/importers/proto/system_probes_module.cc",
         "src/trace_processor/importers/proto/system_probes_parser.cc",
         "src/trace_processor/importers/proto/translation_table_module.cc",
-        "src/trace_processor/importers/proto/v8_module.cc",
-        "src/trace_processor/importers/proto/v8_sequence_state.cc",
-        "src/trace_processor/importers/proto/v8_tracker.cc",
         "src/trace_processor/importers/proto/vulkan_memory_tracker.cc",
     ],
 }
@@ -16249,6 +16257,19 @@ filegroup {
         "src/trace_processor/importers/proto/proto_trace_reader_unittest.cc",
         "src/trace_processor/importers/proto/proto_trace_tokenizer_unittest.cc",
         "src/trace_processor/importers/proto/string_encoding_utils_unittests.cc",
+    ],
+}
+
+// GN: //src/trace_processor/importers/proto:v8_importer
+filegroup {
+    name: "perfetto_src_trace_processor_importers_proto_v8_importer",
+    srcs: [
+        "src/trace_processor/importers/proto/jit_tracker.cc",
+        "src/trace_processor/importers/proto/string_encoding_utils.cc",
+        "src/trace_processor/importers/proto/v8_additional_modules.cc",
+        "src/trace_processor/importers/proto/v8_module.cc",
+        "src/trace_processor/importers/proto/v8_sequence_state.cc",
+        "src/trace_processor/importers/proto/v8_tracker.cc",
     ],
 }
 
@@ -17880,6 +17901,7 @@ cc_library_static {
         ":perfetto_src_trace_processor_importers_proto_minimal",
         ":perfetto_src_trace_processor_importers_proto_packet_sequence_state_generation_hdr",
         ":perfetto_src_trace_processor_importers_proto_proto_importer_module",
+        ":perfetto_src_trace_processor_importers_proto_v8_importer",
         ":perfetto_src_trace_processor_importers_proto_winscope_full",
         ":perfetto_src_trace_processor_importers_simpleperf_proto_simpleperf_proto",
         ":perfetto_src_trace_processor_importers_syscalls_full",
@@ -19677,6 +19699,7 @@ java_library {
         "protos/perfetto/trace/chrome/chrome_trace_event.proto",
         "protos/perfetto/trace/chrome/chrome_trigger.proto",
         "protos/perfetto/trace/chrome/v8.proto",
+        "protos/perfetto/trace/chrome/v8_cpu_profile.proto",
         "protos/perfetto/trace/clock_snapshot.proto",
         "protos/perfetto/trace/etw/etw.proto",
         "protos/perfetto/trace/etw/etw_event.proto",
@@ -20375,6 +20398,7 @@ cc_test {
         ":perfetto_src_trace_processor_importers_proto_packet_sequence_state_generation_hdr",
         ":perfetto_src_trace_processor_importers_proto_proto_importer_module",
         ":perfetto_src_trace_processor_importers_proto_unittests",
+        ":perfetto_src_trace_processor_importers_proto_v8_importer",
         ":perfetto_src_trace_processor_importers_proto_winscope_full",
         ":perfetto_src_trace_processor_importers_proto_winscope_unittests",
         ":perfetto_src_trace_processor_importers_simpleperf_proto_simpleperf_proto",
@@ -21331,6 +21355,7 @@ cc_library_static {
         ":perfetto_src_trace_processor_importers_proto_minimal",
         ":perfetto_src_trace_processor_importers_proto_packet_sequence_state_generation_hdr",
         ":perfetto_src_trace_processor_importers_proto_proto_importer_module",
+        ":perfetto_src_trace_processor_importers_proto_v8_importer",
         ":perfetto_src_trace_processor_importers_proto_winscope_full",
         ":perfetto_src_trace_processor_importers_simpleperf_proto_simpleperf_proto",
         ":perfetto_src_trace_processor_importers_syscalls_full",
@@ -21895,6 +21920,7 @@ cc_binary_host {
         ":perfetto_src_trace_processor_importers_proto_minimal",
         ":perfetto_src_trace_processor_importers_proto_packet_sequence_state_generation_hdr",
         ":perfetto_src_trace_processor_importers_proto_proto_importer_module",
+        ":perfetto_src_trace_processor_importers_proto_v8_importer",
         ":perfetto_src_trace_processor_importers_proto_winscope_full",
         ":perfetto_src_trace_processor_importers_simpleperf_proto_simpleperf_proto",
         ":perfetto_src_trace_processor_importers_syscalls_full",

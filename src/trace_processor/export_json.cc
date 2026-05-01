@@ -50,6 +50,7 @@
 #include "src/trace_processor/tables/metadata_tables_py.h"
 #include "src/trace_processor/tables/profiler_tables_py.h"
 #include "src/trace_processor/tables/slice_tables_py.h"
+#include "src/trace_processor/tables/v8_tables_py.h"
 #include "src/trace_processor/trace_processor_storage_impl.h"
 #include "src/trace_processor/types/trace_processor_context.h"
 #include "src/trace_processor/types/variadic.h"
@@ -149,6 +150,7 @@ class JsonExporter {
     RETURN_IF_ERROR(ExportSlices());
     RETURN_IF_ERROR(ExportFlows());
     RETURN_IF_ERROR(ExportRawEvents());
+    RETURN_IF_ERROR(ExportV8CpuProfile());
     RETURN_IF_ERROR(ExportMetadata());
     RETURN_IF_ERROR(ExportStats());
     RETURN_IF_ERROR(ExportMemorySnapshots());
@@ -1239,6 +1241,231 @@ class JsonExporter {
                  it.name() == *raw_chrome_metadata_event_id) {
         const Dom& args = args_builder_.GetArgs(it.arg_set_id());
         writer_.MergeMetadata(args);
+      }
+    }
+    return base::OkStatus();
+  }
+
+  // Synthesizes legacy devtools "Profile" / "ProfileChunk" trace events from
+  // the native __intrinsic_v8_cpu_profile_* tables populated by the
+  // V8CpuProfileChunk proto importer. Reproduces the field set DevTools
+  // expects, but emits a single ProfileChunk per session (chunk boundaries
+  // from the input trace are not preserved).
+  base::Status ExportV8CpuProfile() {
+    const auto& sessions = storage_->v8_cpu_profile_session_table();
+    if (sessions.row_count() == 0) {
+      return base::OkStatus();
+    }
+
+    const auto& nodes = storage_->v8_cpu_profile_node_table();
+    const auto& v8_samples = storage_->v8_cpu_profile_sample_table();
+    const auto& trace_ids = storage_->v8_cpu_profile_trace_id_table();
+    const auto& sample_table = storage_->cpu_profile_stack_sample_table();
+    const auto& chunks = storage_->v8_cpu_profile_chunk_table();
+
+    constexpr char kCategory[] = "disabled-by-default-v8.cpu_profiler";
+    constexpr char kPhase[] = "P";
+
+    auto utid_to_pid_and_tid = [&](UniqueTid utid) {
+      auto p = UtidToPidAndTid(utid);
+      return std::pair<int64_t, int64_t>{p.first, p.second};
+    };
+
+    for (auto sit = sessions.IterateRows(); sit; ++sit) {
+      tables::V8CpuProfileSessionTable::Id session_row_id = sit.id();
+      uint64_t session_id = static_cast<uint64_t>(sit.session_id());
+      auto pid_and_tid = utid_to_pid_and_tid(sit.utid());
+
+      // -------- Profile event (session start) --------
+      Dom profile_event(Type::kObject);
+      profile_event["pid"] = static_cast<int>(pid_and_tid.first);
+      profile_event["tid"] = static_cast<int>(pid_and_tid.second);
+      profile_event["ts"] = sit.start_ts() / 1000;
+      if (auto v = sit.start_thread_ts(); v) {
+        profile_event["tts"] = *v / 1000;
+      }
+      profile_event["ph"] = kPhase;
+      profile_event["cat"] = kCategory;
+      profile_event["name"] = "Profile";
+      profile_event["dur"] = static_cast<int64_t>(0);
+      profile_event["tdur"] = static_cast<int64_t>(0);
+      profile_event["id"] = base::Uint64ToHexString(session_id);
+
+      Dom profile_data(Type::kObject);
+      if (auto v = sit.start_time_us(); v) {
+        profile_data["startTime"] = *v;
+      }
+      if (auto v = sit.source(); v) {
+        profile_data["source"] = storage_->GetString(*v).ToStdString();
+      }
+      Dom profile_args(Type::kObject);
+      profile_args["data"] = std::move(profile_data);
+      profile_event["args"] = std::move(profile_args);
+      writer_.WriteCommonEvent(profile_event);
+
+      // -------- ProfileChunk events (one per v8_cpu_profile_chunk row)
+      // -------- Mirrors the legacy V8 emission cadence: every flush of
+      // nodes/samples from the V8 profiler produced a separate ProfileChunk.
+      // The per-chunk boundary is preserved via the v8_cpu_profile_chunk table.
+      int64_t prev_ts = sit.start_ts();
+      bool first_chunk_emitted = false;
+      for (auto cit = chunks.IterateRows(); cit; ++cit) {
+        if (cit.v8_cpu_profile_session_id() != session_row_id) {
+          continue;
+        }
+        tables::V8CpuProfileChunkTable::Id chunk_row_id = cit.id();
+
+        Dom nodes_array(Type::kArray);
+        for (auto nit = nodes.IterateRows(); nit; ++nit) {
+          if (nit.v8_cpu_profile_chunk_id() != chunk_row_id) {
+            continue;
+          }
+          Dom node_dom(Type::kObject);
+          Dom call_frame(Type::kObject);
+          call_frame["functionName"] =
+              nit.function_name()
+                  ? storage_->GetString(*nit.function_name()).ToStdString()
+                  : std::string();
+          if (auto v = nit.url(); v) {
+            call_frame["url"] = storage_->GetString(*v).ToStdString();
+          }
+          call_frame["scriptId"] = nit.script_id() ? *nit.script_id() : 0;
+          if (auto v = nit.line(); v) {
+            call_frame["lineNumber"] = *v;
+          }
+          if (auto v = nit.column(); v) {
+            call_frame["columnNumber"] = *v;
+          }
+          if (auto v = nit.code_type(); v) {
+            call_frame["codeType"] = storage_->GetString(*v).ToStdString();
+          } else {
+            call_frame["codeType"] = std::string();
+          }
+          node_dom["callFrame"] = std::move(call_frame);
+          node_dom["id"] = static_cast<int64_t>(nit.node_id());
+          // Recover parent node id by walking back through the callsite table.
+          auto cs_rr = storage_->stack_profile_callsite_table().FindById(
+              nit.callsite_id());
+          if (cs_rr) {
+            if (auto parent_callsite = cs_rr->parent_id(); parent_callsite) {
+              for (auto p = nodes.IterateRows(); p; ++p) {
+                if (p.v8_cpu_profile_session_id() == session_row_id &&
+                    p.callsite_id() == *parent_callsite) {
+                  node_dom["parent"] = static_cast<int64_t>(p.node_id());
+                  break;
+                }
+              }
+            }
+          }
+          if (auto v = nit.deopt_reason(); v) {
+            node_dom["deoptReason"] = storage_->GetString(*v).ToStdString();
+          }
+          nodes_array.Append(std::move(node_dom));
+        }
+
+        Dom samples_array(Type::kArray);
+        Dom lines_array(Type::kArray);
+        Dom columns_array(Type::kArray);
+        bool has_non_zero_lines = false;
+        Dom deltas_array(Type::kArray);
+        for (auto svit = v8_samples.IterateRows(); svit; ++svit) {
+          if (svit.v8_cpu_profile_chunk_id() != chunk_row_id) {
+            continue;
+          }
+          samples_array.Append(static_cast<int64_t>(svit.node_id()));
+          int64_t line_val = svit.line() ? *svit.line() : 0;
+          int64_t col_val = svit.column() ? *svit.column() : 0;
+          if (line_val != 0) {
+            has_non_zero_lines = true;
+          }
+          lines_array.Append(line_val);
+          columns_array.Append(col_val);
+          auto stack_rr =
+              sample_table.FindById(svit.cpu_profile_stack_sample_id());
+          int64_t sample_ts = stack_rr ? stack_rr->ts() : prev_ts;
+          int64_t delta_ns = sample_ts - prev_ts;
+          deltas_array.Append(delta_ns / 1000);
+          prev_ts = sample_ts;
+        }
+
+        // trace_ids: emit the full session-level mapping on the first chunk
+        // and an empty object on subsequent chunks (closest fidelity available
+        // without per-chunk mapping rows).
+        Dom trace_ids_obj(Type::kObject);
+        if (!first_chunk_emitted) {
+          for (auto tit = trace_ids.IterateRows(); tit; ++tit) {
+            if (tit.v8_cpu_profile_session_id() != session_row_id) {
+              continue;
+            }
+            trace_ids_obj[std::to_string(tit.trace_id())] =
+                static_cast<int64_t>(tit.node_id());
+          }
+        }
+
+        Dom cpu_profile(Type::kObject);
+        cpu_profile["nodes"] = std::move(nodes_array);
+        cpu_profile["samples"] = std::move(samples_array);
+        cpu_profile["trace_ids"] = std::move(trace_ids_obj);
+
+        Dom data(Type::kObject);
+        if (auto v = sit.source(); v) {
+          data["source"] = storage_->GetString(*v).ToStdString();
+        }
+        data["cpuProfile"] = std::move(cpu_profile);
+        data["timeDeltas"] = std::move(deltas_array);
+        if (has_non_zero_lines) {
+          data["lines"] = std::move(lines_array);
+          data["columns"] = std::move(columns_array);
+        }
+
+        Dom args(Type::kObject);
+        args["data"] = std::move(data);
+
+        Dom chunk_event(Type::kObject);
+        chunk_event["pid"] = static_cast<int>(pid_and_tid.first);
+        chunk_event["tid"] = static_cast<int>(pid_and_tid.second);
+        chunk_event["ts"] = cit.ts() / 1000;
+        if (auto v = cit.thread_ts(); v) {
+          chunk_event["tts"] = *v / 1000;
+        }
+        chunk_event["ph"] = kPhase;
+        chunk_event["cat"] = kCategory;
+        chunk_event["name"] = "ProfileChunk";
+        chunk_event["dur"] = static_cast<int64_t>(0);
+        chunk_event["tdur"] = static_cast<int64_t>(0);
+        chunk_event["id"] = base::Uint64ToHexString(session_id);
+        chunk_event["args"] = std::move(args);
+        writer_.WriteCommonEvent(chunk_event);
+        first_chunk_emitted = true;
+      }
+
+      // -------- Trailing ProfileChunk with endTime, if available --------
+      if (auto end_ts = sit.end_ts(); end_ts) {
+        Dom end_event(Type::kObject);
+        end_event["pid"] = static_cast<int>(pid_and_tid.first);
+        end_event["tid"] = static_cast<int>(pid_and_tid.second);
+        end_event["ts"] = *end_ts / 1000;
+        if (auto v = sit.end_thread_ts(); v) {
+          end_event["tts"] = *v / 1000;
+        }
+        end_event["ph"] = kPhase;
+        end_event["cat"] = kCategory;
+        end_event["name"] = "ProfileChunk";
+        end_event["dur"] = static_cast<int64_t>(0);
+        end_event["tdur"] = static_cast<int64_t>(0);
+        end_event["id"] = base::Uint64ToHexString(session_id);
+
+        Dom end_data(Type::kObject);
+        if (auto v = sit.end_time_us(); v) {
+          end_data["endTime"] = *v;
+        }
+        if (auto v = sit.source(); v) {
+          end_data["source"] = storage_->GetString(*v).ToStdString();
+        }
+        Dom end_args(Type::kObject);
+        end_args["data"] = std::move(end_data);
+        end_event["args"] = std::move(end_args);
+        writer_.WriteCommonEvent(end_event);
       }
     }
     return base::OkStatus();
