@@ -173,6 +173,7 @@ from diff_tests.stdlib.span_join.tests_smoke import SpanJoinSmoke
 from diff_tests.stdlib.stacks.tests import Stacks
 from diff_tests.stdlib.symbolize.tests import Symbolize
 from diff_tests.stdlib.tests import StdlibSmoke
+from diff_tests.stdlib.v8.tests import V8CpuProfile
 from diff_tests.stdlib.timestamps.tests import Timestamps
 from diff_tests.stdlib.traced.stats import TracedStats
 from diff_tests.stdlib.trees.table_conversion_tests import TreeRoundtrip
@@ -349,6 +350,7 @@ def fetch_all_diff_tests(
       SpanJoinRegression,
       SpanJoinSmoke,
       Stacks,
+      V8CpuProfile,
       CreateIntervals,
       StdlibIntervals,
       SystemUICujs,

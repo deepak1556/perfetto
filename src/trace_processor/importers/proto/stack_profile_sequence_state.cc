@@ -34,10 +34,12 @@
 #include "src/trace_processor/importers/proto/packet_sequence_state_generation.h"
 #include "src/trace_processor/importers/proto/profile_packet_utils.h"
 #include "src/trace_processor/importers/proto/track_event_thread_descriptor.h"
+#include "src/trace_processor/importers/proto/v8_cpu_profile_module.h"
 #include "src/trace_processor/storage/stats.h"
 #include "src/trace_processor/storage/trace_storage.h"
 #include "src/trace_processor/types/trace_processor_context.h"
 #include "src/trace_processor/util/build_id.h"
+#include "src/trace_processor/util/interned_message_view.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -266,6 +268,7 @@ std::optional<FrameId> StackProfileSequenceState::FindOrInsertFrame(
     FrameId frame_id = dummy_mapping_for_interned_frames_->InternDummyFrame(
         function_name, source_file, line_number);
     cached_frames_.Insert({upid, iid}, frame_id);
+    AttachRuntimeFrameExtensions(state, frame_id, iid);
     return frame_id;
   }
 
@@ -284,6 +287,8 @@ std::optional<FrameId> StackProfileSequenceState::FindOrInsertFrame(
   if (!mapping->is_jitted()) {
     cached_frames_.Insert({upid, iid}, frame_id);
   }
+
+  AttachRuntimeFrameExtensions(state, frame_id, iid);
 
   return frame_id;
 }
@@ -324,6 +329,18 @@ StackProfileSequenceState::LookupInternedSourcePath(
   }
 
   return ToStringView(decoder->str());
+}
+
+void StackProfileSequenceState::AttachRuntimeFrameExtensions(
+    PacketSequenceStateGeneration* state,
+    FrameId frame_id,
+    uint64_t iid) {
+  InternedMessageView* view = state->GetInternedMessageView(
+      protos::pbzero::InternedData::kFramesFieldNumber, iid);
+  if (!view)
+    return;
+  V8CpuProfileModule::OnFrameInterned(
+      context_, frame_id, view->message().data(), view->message().length());
 }
 
 }  // namespace trace_processor

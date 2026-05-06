@@ -42,6 +42,7 @@
 #include "src/trace_processor/importers/proto/proto_importer_module.h"
 #include "src/trace_processor/importers/proto/stack_profile_sequence_state.h"
 #include "src/trace_processor/importers/proto/track_event_sequence_state.h"
+#include "src/trace_processor/importers/proto/v8_cpu_profile_module.h"
 #include "src/trace_processor/sorter/trace_sorter.h"
 #include "src/trace_processor/storage/stats.h"
 #include "src/trace_processor/storage/trace_storage.h"
@@ -176,6 +177,11 @@ void ProfileModule::ParseStreamingProfilePacket(
   protos::pbzero::StreamingProfilePacket::Decoder packet(
       streaming_profile_packet.data, streaming_profile_packet.size);
 
+  // Parse V8-specific extension arrays once per packet.
+  V8CpuProfileModule::V8SampleExtensions v8_exts =
+      V8CpuProfileModule::ParseStreamingProfileExtensions(
+          streaming_profile_packet.data, streaming_profile_packet.size);
+
   ProcessTracker* procs = context_->process_tracker.get();
   TraceStorage* storage = context_->storage.get();
   StackProfileSequenceState& stack_profile_sequence_state =
@@ -188,9 +194,10 @@ void ProfileModule::ParseStreamingProfilePacket(
   const UniquePid upid = procs->GetOrCreateProcess(pid);
 
   // Iterate through timestamps and callstacks simultaneously.
+  size_t sample_index = 0;
   auto timestamp_it = packet.timestamp_delta_us();
   for (auto callstack_it = packet.callstack_iid(); callstack_it;
-       ++callstack_it, ++timestamp_it) {
+       ++callstack_it, ++timestamp_it, ++sample_index) {
     if (!timestamp_it) {
       context_->storage->IncrementStats(stats::stackprofile_parser_error);
       PERFETTO_ELOG(
@@ -210,7 +217,11 @@ void ProfileModule::ParseStreamingProfilePacket(
 
     tables::CpuProfileStackSampleTable::Row sample_row{
         timestamp, *opt_cs_id, utid, packet.process_priority()};
-    storage->mutable_cpu_profile_stack_sample_table()->Insert(sample_row);
+    auto sample_id = storage->mutable_cpu_profile_stack_sample_table()
+                         ->Insert(sample_row)
+                         .id;
+    V8CpuProfileModule::OnSampleInserted(context_, sample_id, v8_exts,
+                                         sample_index);
   }
 }
 

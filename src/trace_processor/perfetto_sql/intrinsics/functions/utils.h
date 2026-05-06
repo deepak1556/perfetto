@@ -54,18 +54,27 @@
 
 namespace perfetto::trace_processor {
 
+class PerfettoSqlEngine;
+
 struct ExportJson : public sqlite::Function<ExportJson> {
   static constexpr char kName[] = "export_json";
   static constexpr int kArgCount = 1;
 
-  using UserData = TraceStorage;
+  struct Context {
+    Context(TraceStorage* s, PerfettoSqlEngine* e) : storage(s), engine(e) {}
+
+    TraceStorage* storage;
+    PerfettoSqlEngine* engine;
+  };
+
+  using UserData = Context;
   static void Step(sqlite3_context* ctx, int argc, sqlite3_value** argv);
 };
 
 void ExportJson::Step(sqlite3_context* ctx, int argc, sqlite3_value** argv) {
   PERFETTO_DCHECK(argc == 1);
 
-  auto* storage = GetUserData(ctx);
+  auto* user_data = GetUserData(ctx);
   base::ScopedFstream output;
 
   switch (sqlite::value::Type(argv[0])) {
@@ -98,7 +107,8 @@ void ExportJson::Step(sqlite3_context* ctx, int argc, sqlite3_value** argv) {
           "EXPORT_JSON: argument must be filename string or file descriptor");
   }
 
-  auto status = json::ExportJson(storage, output.get());
+  auto status =
+      json::ExportJson(user_data->storage, output.get(), user_data->engine);
   if (!status.ok()) {
     return sqlite::utils::SetError(ctx, status);
   }

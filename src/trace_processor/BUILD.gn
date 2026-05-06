@@ -73,6 +73,16 @@ source_set("export_json") {
     "util:json_value",
   ]
   public_deps = [ "../../include/perfetto/ext/trace_processor:export_json" ]
+
+  # The V8 CPU profile JSON exporter is driven by the SQL engine.
+  if (enable_perfetto_trace_processor_sqlite) {
+    deps += [
+      "../../gn:sqlite",
+      "perfetto_sql/engine",
+      "sqlite",
+    ]
+    defines = [ "PERFETTO_EXPORT_JSON_HAS_SQL_ENGINE" ]
+  }
 }
 
 source_set("metatrace") {
@@ -333,7 +343,9 @@ perfetto_unittest_source_set("top_level_unittests") {
     sources += [ "export_json_unittest.cc" ]
     deps += [
       ":export_json",
+      ":lib",
       "../../include/perfetto/ext/trace_processor:export_json",
+      "../../include/perfetto/trace_processor",
       "containers",
       "importers/common",
       "importers/proto:minimal",
